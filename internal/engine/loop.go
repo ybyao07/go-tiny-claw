@@ -56,7 +56,8 @@ func (e *AgentEngine) Run(ctx context.Context, userPrompt string, reporter Repor
 			if err != nil {
 				return fmt.Errorf("Thinking 生成失败: %w", err)
 			}
-			if thinkResp.Content != "" {
+			// DeepSeek V4 可能只填 reasoning_content；也必须保留以便后续 tools 请求回传
+			if thinkResp.Content != "" || thinkResp.ReasoningContent != "" {
 				contextHistory = append(contextHistory, *thinkResp)
 			}
 		}

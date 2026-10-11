@@ -77,6 +77,12 @@ func (p *OpenAIProvider) Generate(ctx context.Context, msgs []schema.Message, av
 				astParam.ToolCalls = toolCalls
 			}
 
+			// DeepSeek V4 thinking：后续若带 tools，assistant 必须带上 reasoning_content，
+			// 即使是空字符串也不能省略，否则 API 返回 400。
+			astParam.SetExtraFields(map[string]any{
+				"reasoning_content": msg.ReasoningContent,
+			})
+
 			openaiMsgs = append(openaiMsgs, openai.ChatCompletionMessageParamUnion{
 				OfAssistant: &astParam,
 			})
@@ -128,8 +134,9 @@ func (p *OpenAIProvider) Generate(ctx context.Context, msgs []schema.Message, av
 	// 4. 将 API Response 反向翻译为内部 schema.Message
 	choice := resp.Choices[0].Message
 	resultMsg := &schema.Message{
-		Role:    schema.RoleAssistant,
-		Content: choice.Content,
+		Role:             schema.RoleAssistant,
+		Content:          choice.Content,
+		ReasoningContent: extractReasoningContent(choice),
 	}
 
 	for _, tc := range choice.ToolCalls {
@@ -143,4 +150,22 @@ func (p *OpenAIProvider) Generate(ctx context.Context, msgs []schema.Message, av
 	}
 
 	return resultMsg, nil
+}
+
+// extractReasoningContent 从 DeepSeek 等兼容端返回的扩展字段中取出 reasoning_content。
+// 注意：openai-go 对未知扩展字段的 Valid() 常为 false，不能用它判断是否存在。
+func extractReasoningContent(msg openai.ChatCompletionMessage) string {
+	field, ok := msg.JSON.ExtraFields["reasoning_content"]
+	if !ok {
+		return ""
+	}
+	raw := field.Raw()
+	if raw == "" || raw == "null" {
+		return ""
+	}
+	var reasoning string
+	if err := json.Unmarshal([]byte(raw), &reasoning); err != nil {
+		return ""
+	}
+	return reasoning
 }

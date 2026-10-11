@@ -16,6 +16,10 @@ type Message struct {
 	Role    Role   `json:"role"`
 	Content string `json:"content"` // 存放纯文本内容
 
+	// DeepSeek V4 thinking 模式下返回的推理内容。
+	// 后续请求若携带 tools，必须原样回传，否则 API 会返回 400。
+	ReasoningContent string `json:"reasoning_content,omitempty"`
+
 	// 如果模型决定调用工具，此字段将被填充 (支持并行调用多个工具)
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 
